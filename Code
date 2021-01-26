@@ -1,0 +1,859 @@
+Academia de Studii Economice
+Facultatea de Cibernetică, Statistică și Informatică Economică
+
+PROIECT SGBD
+
+MAGAZIN DE ECHIPAMENTE MEDICALE
+
+Lungu Costin
+
+București 2020
+ 
+Cuprins
+
+A)	Descrierea problemei și prezentarea schemei conceptuale a tabelelor	3
+B)	Interacțiunea cu serverul Oracle prin intermediul comenzilor SQL	6
+C)	STRUCTURI ALTERNATIVE	9
+D)	Tratarea EXCEPȚIILOR predefinite (IMPLICITE)	11
+Tratarea excepțiilor definite de utilizator (EXPLICITE)	13
+E)	CURSORI IMPLICIȚI:	15
+E)	CURSORI EXPLICIȚI:	16
+F) Funcții, proceduri, includerea acestora în pachete	19
+Pachete:	22
+G) Declanșatori:	26
+Scripturi folosite	30
+
+ 
+A)	Descrierea problemei și prezentarea schemei conceptuale a tabelelor
+
+Am ales crearea unei baze de date pentru o firma de  echipamente medicale, în vederea căruia am stocat date în 6 tabele, conectate între ele prin tipurile de legături dobândite în urma parcurgerii seminarelor.
+Firma de echipamente medicale oferă clienților produse multiple ce sunt obținute în urma cumpărării de la mai mulți furnizori. În cadrul magazinului există angajați organizați pe mai multe raioane, în funcție de produsele specifice vândute, respectiv pe fizioterapie, cardiologie și estetică medicală.
+Pentru ca magazinul de echipamente medicale să gestioneze fluxul de produse, a fost creată baza de date cu următoarele tabele și relații:
+
+
+
+
+SCHIȚĂ TABELELOR BAZEI DE DATE
+
+  
+TABELE EXISTENTE ȘI ÎMBUNĂTĂȚIȚE:
+Tabela ANGAJAȚI:
+ 
+
+Tabela CLIENȚI:
+ 
+
+Tabela COMENZI:
+ 
+
+
+Tabela FURNIZORI:
+ 
+
+
+Tabela PRODUSE:
+ 
+
+
+Tabela RAIOANE:
+ 
+ 
+B)	Interacțiunea cu serverul Oracle prin intermediul comenzilor SQL
+
+Crearea tabelei ESTETICA in care au fost introduși angajații din raionul estetica:
+
+SET SERVEROUTPUT ON
+begin
+EXECUTE IMMEDIATE
+'CREATE TABLE ESTETICA AS SELECT * 
+FROM ANGAJATI 
+WHERE ID_RAION=(33) ';
+end;
+
+ 
+
+Inserarea în tabela Produse un nou produs:
+
+BEGIN
+INSERT INTO PRODUSE (id_produs, nume_produs, pret_produs, detalii_produs)
+VALUES (16, 'FACIALTENS', 7500, 'ESTETICA');
+END;
+/
+select * from PRODUSE;
+
+ 
+
+ 
+Folosind comanda UPDATE se mărește cu 10% salariul angajaților din tabela ANGAJATI care au în prezent salariul mai mic decât 3000 de lei:
+ 
+ 
+
+Folosind comanda DELETE, angajatul cu numele Enache este sters din tabela ANGAJATI:
+ 
+ 
+	Afișarea id-ului și numelui clientului care a cumpărat 5 produse per comandă:
+SET SERVEROUTPUT ON
+DECLARE
+v_id number(5);
+v_nume varchar2(20);
+BEGIN
+Select c.ID_CLIENT,c.NUME_CLIENT
+INTO v_id, v_nume
+from CLIENTI c, COMENZI CO
+where c.ID_CLIENT=CO.ID_CLIENT and CO.CANTITATE_PRODUS=5;
+DBMS_OUTPUT.PUT_LINE('ID CLIENT: '||v_id ||' SI NUME CLIENT: '||v_nume);
+END;
+
+ 
+
+Am folosit variabila de substitutie v_nume, comanda  PRINT pentru introducerea de la tastatură a numelui unui angajat și afișarea salariului acestuia:
+SET SERVEROUTPUT ON
+DECLARE 
+v_nume angajati.nume_angajat%type;
+BEGIN
+SELECT nume_angajat, salariu_angajat into v_nume, :SALARIU
+FROM ANGAJATI WHERE NUME_ANGAJAT='&Nume'; 
+DBMS_OUTPUT.PUT_LINE ('Numele angajatului este: '||v_nume);
+END;
+/
+print SALARIU
+
+ 
+ 
+C)	STRUCTURI ALTERNATIVE
+
+Folosind structura „IF.. THEN.. END IF” au fost afișate prețurile produselor cu id-urile 10 și 11, adăugându-se la prețul de initial procentul de 15%, dacă produsul avea prețul cuprins între 5000 și 7000 de lei, respectiv procentul de 10%, dacă produsul avea prețul mai mare de 7000:
+SET SERVEROUTPUT ON
+DECLARE
+v_initial produse.pret_produs%type;
+BEGIN
+SELECT pret_produs into v_initial from produse where id_produs=&Produs;
+dbms_output.put_line ('Pretul initial este: '|| v_initial);
+IF v_initial < 5000 THEN 
+	v_initial:=1.2* v_initial;
+ELSIF v_initial between 5000 and 7000 THEN
+	v_initial:=1.15 * v_initial;
+ELSE 
+	v_initial:=1.1* v_initial;
+END IF;
+dbms_output.put_line('Pretul final este: '|| v_initial);
+end;
+/
+
+ 
+ 
+
+Folosind structura „CASE… WHEN… THEN…” a fost calculată reducerea comenzilor în funcție de cantitatea de produse cumpărate, respective pentru comenzi de 1-2 produse reducerea a fost de 10%, între 3-5 produse cumpărate o reducere de 15%, iar peste 5 produse o reducere de 20% din valoarea totală a comenzii:
+SET SERVEROUTPUT ON
+DEFINE p;
+ACCEPT p PROMPT 'Introduceti id comanda:';
+DECLARE
+cant comenzi.cantitate_produs%TYPE;
+pret comenzi.pret_produs%type;
+BEGIN
+SELECT cantitate_produs, pret_produs into cant, pret from comenzi 
+where id_comanda=&p;
+dbms_output.put_line ('Pretul comenzii este: '|| pret*cant);
+dbms_output.put_line ('Cantitatea produselor cumpărate: '|| cant);
+CASE
+WHEN cant < 3 THEN 
+	pret:= 0.1 * pret * cant;
+WHEN cant between 3 and 5 THEN
+	pret:= 0.15 * pret * cant;
+ELSE 
+	pret:= 0.2 * pret * cant;
+END CASE;
+dbms_output.put_line('Reducerea comenzii este de: '|| pret);
+end;
+/
+ 
+ 
+
+
+C) Structuri repetitive
+Folosind structura „WHILE…..LOOP….END LOOP” a fost calculată media salariului angajaților, afișându-se angajații cu salariul mai mic decât media
+SET SERVEROUTPUT ON
+DECLARE
+ID_ANGAJAT angajati.id_angajat%type;
+NUME angajati.nume_angajat%type;
+SALARIU angajati.salariu_angajat%TYPE;
+MEDIA angajati.salariu_angajat%TYPE;
+I NUMBER(3):=1;
+BEGIN
+SELECT AVG(salariu_angajat)INTO  MEDIA FROM angajati;
+DBMS_OUTPUT.PUT_LINE('MEDIA SALARIILOR ANGAJATILOR ESTE: '||MEDIA);
+WHILE I<=10 LOOP
+SELECT nume_angajat, salariu_angajat INTO NUME, SALARIU FROM angajati
+WHERE id_angajat=I;
+DBMS_OUTPUT.PUT_LINE('ANGAJATUL CU ID '||I|| ' ARE NUMELE '||NUME|| ' SI SALARIUL DE '||SALARIU);
+I:=I+1;
+exit when SALARIU>MEDIA;
+END LOOP;
+END;
+/
+ 
+
+
+
+D)	Tratarea EXCEPȚIILOR predefinite (IMPLICITE)
+
+Folosind EXCEPȚIILE predefinite ale Serverului Oracle s-a încercat efectuarea afișării angajatului cu id-ul 13; acesta fiind inexistând am primit afișarea:
+
+ 
+
+SET SERVEROUTPUT ON
+DECLARE
+v_nume VARCHAR2(20);
+BEGIN
+SELECT nume_angajat INTO v_nume 
+FROM angajati
+WHERE id_angajat=13;
+dbms_output.put_line(v_nume);
+EXCEPTION
+WHEN  NO_DATA_FOUND THEN
+dbms_output.put_line('Angajatul cu acest ID este inexistent!');
+END;
+/
+
+Folosind EXCEPȚIILE predefinite ale Serverului Oracle s-a efectuat afișarea angajatului cu prenumele Marin și a numărului de telefon, presupunând că este onomastica acestuia, iar compania dorește să îl felicite, astfel încât la apelul funcției a apărut o eroare, întrucât în cadrul firmei există mai mulți salariați cu același nume, fiind afișată EXCEPȚIA conform căreia „Exista mai multi angajati cu prenumele de Marin”:
+
+SET SERVEROUTPUT ON
+DECLARE
+tel angajati.telefon_angajat%type;
+BEGIN
+select telefon_angajat into tel from angajati where prenume_angajat='Marin';
+DBMS_OUTPUT.PUT_LINE('Marin are numarul de telefon: '||tel);
+EXCEPTION
+WHEN TOO_MANY_ROWS THEN
+DBMS_OUTPUT.PUT_LINE('Exista mai multi angajati cu prenumele de Marin! 
+Utilizati un cursor pentru selectie!');
+END;
+/
+ 
+
+
+Folosind apelul „open c” se deschide un CURSOR, ulterior încercând parcurgerea sa folosind „for”. Instrucțiunea „for” încearcă să deschidă din nou cursorul rezultând excepția 
+
+CURSOR_ALREADY_OPEN:
+DECLARE
+ cursor c is select nume_angajat,prenume_angajat,salariu_angajat from angajati order by salariu_angajat desc;
+BEGIN
+open c;
+ for r in c loop
+  exit when c%rowcount>5;
+   dbms_output.put_line(r.nume_angajat||' '||r.prenume_angajat||' '||r.salariu_angajat);
+ end loop;
+ EXCEPTION
+ WHEN CURSOR_ALREADY_OPEN then
+  dbms_output.put_line('Cursorul este deja deschis');
+end;
+/
+ 
+
+
+Tratarea EXCEPȚIILOR non-predefinite Oracle Server
+
+	Folosind EXCEPȚIILE non-predefinite Oracle Server a fost tratată situația în care introducerea în tabela „RAIOANE” a unui nou raion cu numele „ORTOPEDIE”, fără a-i fi precizat id-ul acestuia:
+
+SET SERVEROUTPUT ON
+DECLARE
+INSERT_EXCEPT EXCEPTION;
+PRAGMA EXCEPTION_INIT(INSERT_EXCEPT, -01400);
+BEGIN
+insert into raioane (id_raion, denumire_raion) values (NULL, 'ORTOPEDIE');
+EXCEPTION
+WHEN insert_except THEN
+DBMS_OUTPUT.PUT_LINE('Nu au fost precizate suficiente informatii pentru raionul introdus!');
+DBMS_OUTPUT.PUT_LINE(SQLERRM);
+END;
+/
+ 
+
+
+Tratarea excepțiilor definite de utilizator (EXPLICITE)
+
+Folosind EXCEPȚIILE definite de utilizator au fost tratate situațiile în care denumirea produsului cu id-ul 3 este inexistend, deoarece produsele sunt create începând cu id-ul 10, respectiv s-a afișat o altă excepție prin care utilizator constată că s-a produs o eroare, în cazul de față s-a confundat „nume_produs” cu „id_produs”: 
+
+DECLARE
+invalid_prod EXCEPTION;
+BEGIN
+UPDATE produse 
+SET nume_produs='Ortoap'
+WHERE nume_produs=3;
+IF SQL%NOTFOUND THEN
+RAISE invalid_prod;
+END IF;
+EXCEPTION
+WHEN invalid_prod THEN
+DBMS_OUTPUT.PUT_LINE('Nu exista produsul cu acest ID');
+WHEN OTHERS THEN
+DBMS_OUTPUT.PUT_LINE('A aparut o eroare! Nu se poate actualiza denumirea produsului!');
+END;
+/
+ 
+ 
+
+Am creat tabela Erori, definită de utilizator, în care au fost introduse excepțiile cu codul și mesajul de eroare din exemplul precedent:
+CREATE TABLE ERORI(
+utilizator varchar2(32),
+data_exc date,
+cod_exc number(7),
+mesaj_exc varchar2(128));
+
+După aceea rulăm blocul PL/SQL:
+SET SERVEROUTPUT ON
+DECLARE
+cod NUMBER(7);
+mesaj VARCHAR2(255);
+invalid_prod EXCEPTION;
+PRAGMA EXCEPTION_INIT(invalid_prod,-20999);
+
+BEGIN
+UPDATE produse 
+SET nume_produs='Laptop ABC'
+WHERE id_produs=3;
+
+IF SQL%NOTFOUND THEN
+RAISE_APPLICATION_ERROR (-20999,'Cod produs invalid!');
+END IF;
+
+EXCEPTION
+WHEN invalid_prod THEN
+DBMS_OUTPUT.PUT_LINE('Nu exista produsul cu acest ID');
+cod:=SQLCODE;
+mesaj:=SQLERRM;
+INSERT INTO ERORI VALUES(USER, SYSDATE, cod, mesaj);
+END;
+/
+SELECT * FROM ERORI;
+  
+Folosind exceptia pre-definită a fost invocată în mod explicit următoarea excepție:
+DECLARE
+invalid_prod EXCEPTION;
+BEGIN
+UPDATE produse 
+SET nume_produs='Laptop ABC'
+WHERE id_produs=3;
+IF SQL%NOTFOUND THEN
+RAISE NO_DATA_FOUND;
+END IF;
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+DBMS_OUTPUT.PUT_LINE(SQLERRM);
+END;
+/
+ 
+
+
+E)	CURSORI IMPLICIȚI:
+Se șterg produsele din categoria „Fizioterapie”, care au fost comandate. Se afișează numărul de rânduri șterse:
+SET SERVEROUTPUT ON
+BEGIN
+DELETE FROM produse p
+WHERE DETALII_PRODUS='FIZIOTERAPIE' and exists (select 1 from COMENZI C where p.id_produs=C.id_produs);
+DBMS_OUTPUT.PUT_LINE (SQL%ROWCOUNT || ' randuri sterse');
+ROLLBACK;
+DBMS_OUTPUT.PUT_LINE (SQL%ROWCOUNT || ' randuri afectate');
+END;
+/
+ 
+
+ 
+Se șterge din tabela PRODUSE, regiunea a cărei ID este introdus de utilizator prin intermediul variabilei de substituție g_rid. Mesajul este afișat folosind variabila de mediu nr_sters.
+ACCEPT g_rid PROMPT 'Introduceti id-ul produsului:'
+VARIABLE nr_sters varchar2(100)
+DECLARE
+BEGIN
+DELETE FROM produse WHERE id_produs=&g_rid;
+:nr_sters:=TO_CHAR(SQL%ROWCOUNT)||' PRODUS STERS';
+END;
+/
+PRINT nr_sters
+ROLLBACK;
+ 
+
+E)	CURSORI EXPLICIȚI:
+
+Să se afişeze lista cu numele şi salariul angajaţilor din raionul 22, folosind un cursor explicit și trei variabile scalare:
+set serveroutput on
+DECLARE
+cursor ang_cursor is select id_angajat, nume_angajat, salariu_angajat from angajati where id_raion=22;
+ang_id angajati.id_angajat%type;
+ang_nume angajati.nume_angajat%type;
+ang_sal angajati.salariu_angajat%type;
+BEGIN
+dbms_output.put_line('Lista cu salariariile angajatilor din raionul 22:');
+open ang_cursor;
+loop
+fetch ang_cursor into ang_id, ang_nume, ang_sal;
+exit when ang_cursor%notfound;
+dbms_output.put_line('Salariatul '||ang_nume||' are salariul: '||ang_sal);
+end loop;
+close ang_cursor;
+end;
+/
+ 
+Să se încarce în tabela MESAJE, nou creată, primii 5 angajaţi (id şi nume):
+CREATE TABLE mesaje 
+(cod varchar2(7),
+nume varchar2(20)
+);
+DECLARE 
+v_id angajati.id_angajat%type;
+v_nume angajati.nume_angajat%type;
+CURSOR c1 IS SELECT id_angajat, nume_angajat FROM angajati;
+BEGIN
+OPEN c1;
+FOR i IN 1..5 LOOP
+FETCH c1 INTO v_id, v_nume;
+INSERT INTO mesaje VALUES(v_id, v_nume);
+END LOOP;
+CLOSE c1;
+END;
+/
+SELECT * FROM mesaje;
+
+ 
+
+
+
+Se afişează printr-un ciclu FOR numele şi salariile angajaţilor din raionul 22:
+set serveroutput on
+declare
+cursor ang_cursor is select id_angajat, nume_angajat, salariu_angajat from angajati where id_raion=22;
+begin
+dbms_output.put_line('Lista cu salariariile angajatilor din raionul 22:');
+for ang_rec in ang_cursor loop
+dbms_output.put_line('Salariatul '||ang_rec.nume_angajat||' are salariul: '||ang_rec.salariu_angajat);
+end loop;
+end;
+/
+ 
+
+Cursor cu parametri:
+Să se afişeze produsele al căror valoarea totală comandată este mai mare decât valoarea totală a comenzilor pentru produsul 13:
+SET SERVEROUTPUT ON
+DECLARE
+CURSOR c_prod (p_val NUMBER) IS 
+SELECT p.id_produs, p.nume_produs, sum(c.cantitate_produs*c.pret_produs) total
+FROM produse p, comenzi c
+WHERE p.id_produs =c.id_produs
+GROUP BY p.id_produs, p.nume_produs
+HAVING sum(c.cantitate_produs*c.pret_produs)>p_val
+ORDER BY total desc;
+v_val NUMBER(5);
+rec_prod c_prod%rowtype;
+BEGIN
+select sum(pret_produs*cantitate_produs) into v_val from comenzi where id_produs=13;
+DBMS_OUTPUT.PUT_LINE('Produsele al caror cantitate vândută este mai mare decat '|| v_val||' sunt:');
+IF NOT c_prod%ISOPEN THEN
+OPEN c_prod (v_val);
+END IF;
+LOOP
+FETCH c_prod into rec_prod;
+EXIT WHEN c_prod%notfound;
+DBMS_OUTPUT.PUT_LINE('Produsul '||rec_prod.id_produs||', '||rec_prod.nume_produs||', vanzarile au fost in valoare de ' ||rec_prod.total||' RON.');
+END LOOP;
+CLOSE c_prod;
+END;
+/
+ 
+F) Funcții, proceduri, includerea acestora în pachete
+
+Proceduri:
+Procedura modifica_salariul primeşte doi parametrii: p_id_angajat şi procent şi majorează cu procentul specificat salariul angajatului cu id_angajat=p_id_angajat:
+CREATE OR REPLACE
+PROCEDURE modifica_salariu_angajat
+(p_id_angajat IN angajati.id_angajat%type, procent IN number)
+IS
+v_salariul angajati.salariu_angajat%type;
+BEGIN
+Select salariu_angajat into v_salariul from angajati where id_angajat=p_id_angajat;
+dbms_output.put_line('Angajatul are salariul de '||v_salariul);
+Update angajati
+Set salariu_angajat=salariu_angajat*(1+procent/100)
+Where id_angajat=p_id_angajat;
+Select salariu_angajat into v_salariul from angajati where id_angajat=p_id_angajat;
+Dbms_output.put_line('Angajatul are acum salariul de '||v_salariul);
+END;
+/
+show errors;
+
+ 
+Sa se realizeze apelul procedurii modifica_salariu_angajat:
+SET SERVEROUTPUT ON
+EXECUTE modifica_salariu_angajat(1, 14)
+
+ 
+
+Sa se vizualizeze procedurile din dictionarul metadatelor:
+select *
+from user_objects
+where object_type='PROCEDURE';
+
+ 
+
+
+Sa se stearga procedura modifica_salariu_angajat, cauta_angajat:
+DROP PROCEDURE modifica_salariu_angajat;
+DROP PROCEDURE cauta_angajat;
+
+ 
+
+Procedura primeşte ca parametru de tip IN id_ul unui angajat şi returnează prin parametrii de tip OUT numele şi salariul acestuia:
+CREATE OR REPLACE PROCEDURE cauta_angajat
+(p_id_angajat IN angajati.id_angajat%type,
+p_nume OUT angajati.nume_angajat%type,
+p_salariul OUT angajati.salariu_angajat%type)
+IS
+BEGIN
+Select nume_angajat, salariu_angajat into p_nume, p_salariul from angajati where id_angajat=p_id_angajat;
+DBMS_OUTPUT.PUT_LINE(' Angajatul '||p_nume||' are salariul de: '||p_salariul);
+END;
+/
+ 
+Sa se creeze o functie PL/SQL pentru calculul taxei tva:
+CREATE OR REPLACE FUNCTION taxa (value IN NUMBER, proc IN NUMBER)
+RETURN NUMBER IS
+BEGIN
+RETURN (value*proc);
+END taxa;
+/
+show errors
+ 
+Apelul funcţiei:
+SELECT id_comanda, cantitate_produs, pret_produs, taxa (pret_produs, 20) as tva
+FROM comenzi;
+ 
+
+CREATE OR REPLACE FUNCTION verifica_client
+(p_nume_client IN clienti.nume_client%type)
+RETURN Boolean 
+IS
+v_nume clienti.nume_client%type;
+BEGIN
+SELECT nume_client into v_nume from clienti where nume_client=p_nume_client;
+IF v_nume = p_nume_client then
+return true;
+ELSE
+return false;
+end if;
+EXCEPTION
+WHEN no_data_found THEN
+return NULL;
+end;
+/
+show errors
+
+ 
+
+Pachete:
+
+Crearea pachetului cu specificarea subprogramelor:
+create or replace PACKAGE actualizare_produse IS
+procedure adauga_produs
+(p_id produse.id_produs%type,
+p_nume produse.nume_produs%type,
+p_pret produse.pret_produs%type,
+p_det produse.detalii_produs%type);
+
+function cauta_produs
+(p_nume produse.nume_produs%type)
+return number;
+
+procedure modifica_produs
+(p_id produse.id_produs%type,
+p_nume produse.nume_produs%type,
+p_pret produse.pret_produs%type);
+
+function sterge_produs
+(p_id produse.id_produs%type)
+return boolean;
+
+exceptie exception;
+END;
+/
+show errors
+ 
+ 
+
+ 
+Ștergerea corpului unui pachet:
+ 
+ 
+
+Crearea unui corp de pachet, în care au fost introduse procedurile adauga_produs, modifica_produs și funcțiile cauta_produs, respectiv sterge_produs:
+create or replace PACKAGE BODY actualizare_produse IS
+procedure adauga_produs
+(p_id produse.id_produs%type,
+p_nume produse.nume_produs%type,
+p_pret produse.pret_produs%type,
+p_det produse.detalii_produs%type)
+is
+begin
+insert into produse(id_produs,nume_produs,pret_produs,detalii_produs) values (p_id,p_nume,p_pret,p_det);
+exception
+when others then
+raise exceptie;
+end adauga_produs;
+
+function cauta_produs
+(p_nume produse.nume_produs%type)
+return number
+is
+v_id_produs produse.id_produs%type;
+begin
+select id_produs into v_id_produs from produse
+where nume_produs like p_nume||'%';
+return v_id_produs;
+exception
+when no_data_found then
+return null;
+when too_many_rows then
+return null;
+end cauta_produs;
+
+procedure modifica_produs
+(p_id produse.id_produs%type,
+p_nume produse.nume_produs%type,
+p_pret produse.pret_produs%type)
+is
+begin
+update produse
+set nume_produs=p_nume, pret_produs=p_pret
+where id_produs=p_id;
+if sql%notfound then
+raise exceptie;
+end if;
+end modifica_produs;
+
+function sterge_produs
+(p_id produse.id_produs%type)
+return boolean
+is
+begin
+delete from produse
+where id_produs=p_id;
+if sql%found then
+raise exceptie;
+end if;
+end sterge_produs;
+END;
+/
+
+ 
+ 
+
+ 
+Vizualizarea ultimei părți a corpului de pachet:
+
+Select text
+From user_source
+Where name='ACTUALIZARE_PRODUSE' and type='PACKAGE BODY';
+
+ 
+ 
+G) Declanșatori:
+
+Se creează un trigger care se declanşează înaintea fiecărei operaţii de inserare în tabela PRODUSE.
+CREATE OR REPLACE TRIGGER produse_trig
+BEFORE INSERT ON produse 
+BEGIN 
+dbms_output.put_line('triggerul s-a executat');
+END; 
+/
+ 
+Ștergerea declanșatorului restrict_salaraiul:
+DROP TRIGGER restrict_salariul
+ 
+
+Am creat triggerul produse_trig_log, care se declanşează la operaţiile de INSERT, DELETE sau UPDATE pe tabela Produse. În tabela TEMP_LOG se introduce tipul operaţiei, utilizatorul care a executat-o și data curentă:
+
+CREATE TABLE temp_log 
+(tip CHAR(1), 
+utilizator VARCHAR2(50), 
+data DATE DEFAULT SYSDATE);
+
+CREATE OR REPLACE TRIGGER produse_trig_log
+BEFORE INSERT or UPDATE or DELETE on produse 
+DECLARE 
+v_tip temp_log.tip%TYPE; 
+BEGIN 
+  case
+  when INSERTING then v_tip :='I';
+  when UPDATING then v_tip:='U';
+  ELSE v_tip :='D';
+  END case;
+  INSERT INTO temp_log(tip, utilizator, data) VALUES (v_tip, user, sysdate);
+END;
+/
+ 
+ 
+Inserarea în tabela, ștergerea din tabelă și afișarea tabelei declanșatorilor:
+insert into produse (id_produs, nume_produs,pret_produs,detalii_produs) 
+values (15, 'TECAR-PRO',9999,'FIZIOTERAPIE');
+delete from produse where id_produs=15;
+commit;
+Select * from temp_log;
+
+ 
+ 
+
+Am creat un declanșator care asigură unicitatea codului produsului folosind valorile generate de o secvenţă
+
+CREATE SEQUENCE produse_secv
+START WITH 1
+INCREMENT BY 1
+MAXVALUE 100
+NOCYCLE;
+ 
+CREATE OR REPLACE TRIGGER generare_codprodus
+BEFORE INSERT ON produse
+FOR EACH ROW
+BEGIN
+SELECT produse_secv.nextval INTO :new.id_produs FROM dual;
+END;
+/
+show errors;
+  
+
+Crearea unei tabele virtuale:
+
+create or replace view clienti_v as
+select cl.id_client, cl.nume_client, co.id_comanda, co.data_comanda
+from clienti cl, comenzi co 
+where cl.id_client=co.id_client;
+ 
+ 
+ 
+
+ 
+Creare unui trigger, folosind clauzele inserting, updating, deleting, la comanda cărora se declanșează:
+
+create or replace trigger trigger_COMENZI
+instead of insert or update or delete on clienti_v
+for each row
+begin
+
+if inserting then
+insert into clienti (id_client, nume_client) values (:new.id_client, :new.nume_client);
+insert into comenzi (id_comanda, data_comanda, id_client) values (:new.id_comanda, :new.data_comanda, :new.id_client);
+
+elsif deleting then
+delete from comenzi where id_comanda=:old.id_comanda;
+
+elsif updating ('nume_client') then
+update clienti
+set nume_client=:new.nume_client
+where id_client=:old.id_client;
+
+elsif updating ('data_comanda') then
+update comenzi
+set data_comanda=:new.data_comanda
+where id_comanda=:old.id_comanda;
+end if;
+
+end;
+/
+show errors;
+
+
+ 
+Scripturi folosite
+
+SET SERVEROUTPUT ON
+begin
+EXECUTE IMMEDIATE
+'CREATE TABLE ESTETICA AS SELECT * 
+FROM ANGAJATI 
+WHERE ID_RAION=(33) ';
+end;
+
+BEGIN
+INSERT INTO PRODUSE (id_produs, nume_produs, pret_produs, detalii_produs)
+VALUES (16, 'FACIALTENS', 7500, 'ESTETICA');
+END;
+/
+select * from PRODUSE;
+
+DECLARE
+v_procent number:=0.1;
+v_prag angajati.salariu_angajat%type:=3000;
+BEGIN
+UPDATE ANGAJATI
+SET salariu_angajat=salariu_angajat*(1+v_procent)
+WHERE salariu_angajat<v_prag;
+END;
+/
+select * from ANGAJATI;
+
+DECLARE
+BEGIN
+DELETE FROM ANGAJATI WHERE initcap(nume_angajat) like 'Enache%';
+END;
+/
+select * from ANGAJATI;
+
+SET SERVEROUTPUT ON
+DECLARE
+v_id number(5);
+v_nume varchar2(20);
+BEGIN
+Select c.ID_CLIENT,c.NUME_CLIENT
+INTO v_id, v_nume
+from CLIENTI c, COMENZI CO
+where c.ID_CLIENT=CO.ID_CLIENT and CO.CANTITATE_PRODUS=5;
+DBMS_OUTPUT.PUT_LINE('ID CLIENT: '||v_id ||' SI NUME CLIENT: '||v_nume);
+END;
+
+SET SERVEROUTPUT ON
+DECLARE 
+v_nume angajati.nume_angajat%type;
+BEGIN
+SELECT nume_angajat, salariu_angajat into v_nume, :SALARIU
+FROM ANGAJATI WHERE NUME_ANGAJAT='&Nume'; 
+DBMS_OUTPUT.PUT_LINE ('Numele angajatului este: '||v_nume);
+END;
+/
+print SALARIU
+
+SET SERVEROUTPUT ON
+DECLARE
+v_initial produse.pret_produs%type;
+BEGIN
+SELECT pret_produs into v_initial from produse where id_produs=&Produs;
+dbms_output.put_line ('Pretul initial este: '|| v_initial);
+IF v_initial < 5000 THEN 
+	v_initial:=1.2* v_initial;
+ELSIF v_initial between 5000 and 7000 THEN
+	v_initial:=1.15 * v_initial;
+ELSE 
+	v_initial:=1.1* v_initial;
+END IF;
+dbms_output.put_line('Pretul final este: '|| v_initial);
+end;
+/
+
+SET SERVEROUTPUT ON
+DEFINE p;
+ACCEPT p PROMPT 'Introduceti id comanda:';
+DECLARE
+cant comenzi.cantitate_produs%TYPE;
+pret comenzi.pret_produs%type;
+BEGIN
+SELECT cantitate_produs, pret_produs into cant, pret from comenzi 
+where id_comanda=&p;
+dbms_output.put_line ('Pretul comenzii este: '|| pret*cant);
+dbms_output.put_line ('Cantitatea produselor cumpărate: '|| cant);
+CASE
+WHEN cant < 3 THEN 
+	pret:= 0.1 * pret * cant;
+WHEN cant between 3 and 5 THEN
+	pret:= 0.15 * pret * cant;
+ELSE 
+	pret:= 0.2 * pret * cant;
+END CASE;
+dbms_output.put_line('Reducerea comenzii este de: '|| pret);
+end;
+/
+
